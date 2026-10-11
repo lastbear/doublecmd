@@ -23,8 +23,35 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Build components
-        run: build.bat components
+      - name: Build chsdet
+        run: lazbuild components\chsdet\chsdet.lpk --cpu=x86_64 --os=win64
+
+      - name: Build multithreadprocs
+        run: lazbuild components\multithreadprocs\multithreadprocslaz.lpk --cpu=x86_64 --os=win64
+
+      - name: Build kascrypt
+        run: lazbuild components\kascrypt\kascrypt.lpk --cpu=x86_64 --os=win64
+
+      - name: Build Double Commander common components
+        run: lazbuild components\doublecmd\doublecmd_common.lpk --cpu=x86_64 --os=win64
+
+      - name: Build Image32
+        run: lazbuild components\Image32\Image32.lpk --cpu=x86_64 --os=win64
+
+      - name: Build KASToolBar
+        run: lazbuild components\KASToolBar\kascomp.lpk --cpu=x86_64 --os=win64
+
+      - name: Build viewer
+        run: lazbuild components\viewer\viewerpackage.lpk --cpu=x86_64 --os=win64
+
+      - name: Build gifview
+        run: lazbuild components\gifview\gifview.lpk --cpu=x86_64 --os=win64
+
+      - name: Build synuni
+        run: lazbuild components\synunihighlighter\synuni.lpk --cpu=x86_64 --os=win64
+
+      - name: Build virtualterminal
+        run: lazbuild components\virtualterminal\virtualterminal.lpk --cpu=x86_64 --os=win64
 
       - name: Build Double Commander (64-bit)
         run: lazbuild src\doublecmd.lpi --bm=Debug --cpu=x86_64 --os=win64
