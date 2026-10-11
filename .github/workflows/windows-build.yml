@@ -1,0 +1,30 @@
+name: Windows build
+
+on:
+  push:
+    branches:
+      - feature/windows-mru-tab-switch
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Install Lazarus
+        uses: doublecmd/lazarus-install@win
+        with:
+          lazarus-version: "stable"
+
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Build components
+        run: build.bat components
+
+      - name: Build Double Commander (64-bit)
+        run: lazbuild src\doublecmd.lpi --bm=Debug --cpu=x86_64 --os=win64

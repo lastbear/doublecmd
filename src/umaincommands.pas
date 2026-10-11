@@ -410,6 +410,9 @@ uses fOptionsPluginsBase, fOptionsPluginsDSX, fOptionsPluginsWCX,
      fMainCommandsDlg, uConnectionManager, fOptionsFavoriteTabs, fTreeViewMenu,
      uArchiveFileSource, fOptionsHotKeys, fBenchmark, uAdministrator, uWcxArchiveFileSource,
      uColumnsFileView
+{$IFDEF MSWINDOWS}
+     , uKeyboard
+{$ENDIF}
      ;
 
 resourcestring
@@ -1776,11 +1779,25 @@ end;
 
 procedure TMainCommands.cm_NextTab(const Params: array of string);
 begin
+{$IFDEF MSWINDOWS}
+  if ssCtrl in GetKeyShiftStateEx then
+  begin
+    frmMain.ActiveNotebook.SwitchToMRUTab(False);
+    Exit;
+  end;
+{$ENDIF}
   frmMain.ActiveNotebook.ActivateNextTab;
 end;
 
 procedure TMainCommands.cm_PrevTab(const Params: array of string);
 begin
+{$IFDEF MSWINDOWS}
+  if ssCtrl in GetKeyShiftStateEx then
+  begin
+    frmMain.ActiveNotebook.SwitchToMRUTab(True);
+    Exit;
+  end;
+{$ENDIF}
   frmMain.ActiveNotebook.ActivatePrevTab;
 end;
 
@@ -5660,4 +5677,3 @@ begin
 end;
 
 end.
-

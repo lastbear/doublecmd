@@ -123,17 +123,30 @@ type
     FHintPos: TPoint;
     FLastMouseDownTime: TDateTime;
     FLastMouseDownPageIndex: Integer;
+{$IFDEF MSWINDOWS}
+    FRecentPages: TList;
+    FMRUCyclePages: TList;
+    FMRUInitialPage: TFileViewPage;
+    FMRUCycleIndex: Integer;
+    FMRUSwitching: Boolean;
+{$ENDIF}
 
     function GetActivePage: TFileViewPage;
     function GetActiveView: TFileView;
     function GetFileViewOnPage(Index: Integer): TFileView;
     function GetPage(Index: Integer): TFileViewPage; reintroduce;
+{$IFDEF MSWINDOWS}
+    procedure UpdateRecentPage(APage: TFileViewPage);
+{$ENDIF}
 
     procedure TabShowHint(Sender: TObject; HintInfo: PHintInfo);
 
   protected
     procedure DoChange; override;
     function GetPageClass: TCustomPageClass; override;
+{$IFDEF MSWINDOWS}
+    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+{$ENDIF}
     procedure MouseDown(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
     procedure MouseMove(Shift: TShiftState; X, Y: Integer); override;
     procedure MouseUp(Button: TMouseButton; Shift: TShiftState; X, Y: Integer); override;
@@ -150,6 +163,9 @@ type
   public
     constructor Create(ParentControl: TWinControl;
                        NotebookSide: TFilePanelSelect); reintroduce;
+{$IFDEF MSWINDOWS}
+    destructor Destroy; override;
+{$ENDIF}
 {$IFDEF LCLWIN32}
     {en
        Removes the rectangle of the pages contents from erasing background to reduce flickering.
@@ -169,6 +185,10 @@ type
     procedure ActivatePrevTab;
     procedure ActivateNextTab;
     procedure ActivateTabByIndex(Index: Integer);
+{$IFDEF MSWINDOWS}
+    procedure SwitchToMRUTab(Backward: Boolean);
+    procedure FinishMRUTabSwitch(Cancel: Boolean = False);
+{$ENDIF}
     function IndexOfPageAt(P: TPoint): Integer; override;
 
     procedure DragDrop(Source: TObject; X,Y: Integer); override;
@@ -420,6 +440,13 @@ constructor TFileViewNotebook.Create(ParentControl: TWinControl;
                                      NotebookSide: TFilePanelSelect);
 begin
   inherited Create(ParentControl);
+{$IFDEF MSWINDOWS}
+  FRecentPages := TList.Create;
+  FMRUCyclePages := TList.Create;
+  FMRUInitialPage := nil;
+  FMRUCycleIndex := 0;
+  FMRUSwitching := False;
+{$ENDIF}
   ControlStyle := ControlStyle + [csNoFocus];
 
   Parent := ParentControl;
@@ -441,6 +468,16 @@ begin
   //DoubleBuffered := True;
   {$ENDIF}
 end;
+
+{$IFDEF MSWINDOWS}
+destructor TFileViewNotebook.Destroy;
+begin
+  FMRUSwitching := False;
+  inherited Destroy;
+  FMRUCyclePages.Free;
+  FRecentPages.Free;
+end;
+{$ENDIF}
 
 function TFileViewNotebook.GetActivePage: TFileViewPage;
 begin
@@ -474,6 +511,17 @@ begin
   Result := TFileViewPage(CustomPage(Index));
 end;
 
+{$IFDEF MSWINDOWS}
+procedure TFileViewNotebook.UpdateRecentPage(APage: TFileViewPage);
+begin
+  if Assigned(APage) and (APage.PageIndex >= 0) then
+  begin
+    FRecentPages.Remove(APage);
+    FRecentPages.Insert(0, APage);
+  end;
+end;
+{$ENDIF}
+
 function TFileViewNotebook.AddPage: TFileViewPage;
 begin
   Result := InsertPage(PageCount);
@@ -483,6 +531,10 @@ function TFileViewNotebook.InsertPage(Index: Integer): TFileViewPage;
 begin
   Tabs.Insert(Index, '');
   Result := GetPage(Index);
+{$IFDEF MSWINDOWS}
+  Result.FreeNotification(Self);
+  FRecentPages.Add(Result);
+{$ENDIF}
   ShowTabs:= ((PageCount > 1) or (tb_always_visible in gDirTabOptions)) and gDirectoryTabs;
 end;
 
@@ -605,6 +657,64 @@ begin
   else
     Page[PageIndex - 1].MakeActive;
 end;
+
+{$IFDEF MSWINDOWS}
+procedure TFileViewNotebook.SwitchToMRUTab(Backward: Boolean);
+var
+  I: Integer;
+  APage: TFileViewPage;
+begin
+  if PageCount < 2 then Exit;
+
+  if not FMRUSwitching then
+  begin
+    FMRUCyclePages.Clear;
+    FMRUInitialPage := ActivePage;
+    FMRUCyclePages.Add(FMRUInitialPage);
+
+    for I := 0 to FRecentPages.Count - 1 do
+    begin
+      APage := TFileViewPage(FRecentPages[I]);
+      if (APage.PageIndex >= 0) and (FMRUCyclePages.IndexOf(APage) < 0) then
+        FMRUCyclePages.Add(APage);
+    end;
+
+    for I := 0 to PageCount - 1 do
+    begin
+      APage := Page[I];
+      if FMRUCyclePages.IndexOf(APage) < 0 then
+        FMRUCyclePages.Add(APage);
+    end;
+
+    FMRUCycleIndex := 0;
+    FMRUSwitching := True;
+  end;
+
+  if Backward then
+    FMRUCycleIndex := (FMRUCycleIndex + FMRUCyclePages.Count - 1) mod FMRUCyclePages.Count
+  else
+    FMRUCycleIndex := (FMRUCycleIndex + 1) mod FMRUCyclePages.Count;
+
+  APage := TFileViewPage(FMRUCyclePages[FMRUCycleIndex]);
+  if APage.PageIndex >= 0 then
+    APage.MakeActive;
+end;
+
+procedure TFileViewNotebook.FinishMRUTabSwitch(Cancel: Boolean);
+begin
+  if not FMRUSwitching then Exit;
+
+  if Cancel and Assigned(FMRUInitialPage) and (FMRUInitialPage.PageIndex >= 0) then
+    FMRUInitialPage.MakeActive;
+
+  FMRUSwitching := False;
+  FMRUInitialPage := nil;
+  FMRUCyclePages.Clear;
+
+  if not Cancel then
+    UpdateRecentPage(ActivePage);
+end;
+{$ENDIF}
 
 procedure TFileViewNotebook.ActivateNextTab;
 begin
@@ -832,7 +942,14 @@ end;
 procedure TFileViewNotebook.DoChange;
 begin
   inherited DoChange;
-  ActivePage.DoActivate;
+  if Assigned(ActivePage) then
+  begin
+{$IFDEF MSWINDOWS}
+    if not FMRUSwitching then
+      UpdateRecentPage(ActivePage);
+{$ENDIF}
+    ActivePage.DoActivate;
+  end;
 {$IF DEFINED(LCLWIN32)}
   if (Win32MajorVersion >= 10)
   {$IF DEFINED(DARKWIN)} and (not g_darkModeEnabled){$ENDIF} then
@@ -840,10 +957,38 @@ begin
 {$ENDIF}
 end;
 
+{$IFDEF MSWINDOWS}
+procedure TFileViewNotebook.Notification(AComponent: TComponent;
+  Operation: TOperation);
+var
+  Index: Integer;
+begin
+  inherited Notification(AComponent, Operation);
+  if Operation = opRemove then
+  begin
+    FRecentPages.Remove(AComponent);
+    Index := FMRUCyclePages.IndexOf(AComponent);
+    if Index >= 0 then
+    begin
+      FMRUCyclePages.Delete(Index);
+      if Index < FMRUCycleIndex then
+        Dec(FMRUCycleIndex);
+      if FMRUCycleIndex >= FMRUCyclePages.Count then
+        FMRUCycleIndex := 0;
+    end;
+    if AComponent = FMRUInitialPage then
+    begin
+      FMRUInitialPage := nil;
+      FMRUSwitching := False;
+      FMRUCyclePages.Clear;
+    end;
+  end;
+end;
+{$ENDIF}
+
 function TFileViewNotebook.GetPageClass: TCustomPageClass;
 begin
   Result:= TFileViewPage;
 end;
 
 end.
-

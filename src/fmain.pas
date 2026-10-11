@@ -4195,6 +4195,14 @@ end;
 procedure TfrmMain.FormKeyUp( Sender: TObject; var Key: Word;
   Shift: TShiftState) ;
 begin
+{$IFDEF MSWINDOWS}
+  if (Key in [VK_CONTROL, VK_LCONTROL, VK_RCONTROL]) and
+     not (ssCtrl in GetKeyShiftStateEx) then
+  begin
+    nbLeft.FinishMRUTabSwitch;
+    nbRight.FinishMRUTabSwitch;
+  end;
+{$ENDIF}
   SetDragCursor(Shift);
 end;
 
@@ -4222,6 +4230,14 @@ var
   CmdText : String;
 begin
   SetDragCursor(Shift);
+
+{$IFDEF MSWINDOWS}
+  if Key = VK_ESCAPE then
+  begin
+    nbLeft.FinishMRUTabSwitch(True);
+    nbRight.FinishMRUTabSwitch(True);
+  end;
+{$ENDIF}
 
   if ActiveControl = nil then
     ActiveFrame.SetFocus;
@@ -7339,6 +7355,12 @@ end;
 
 procedure TfrmMain.AppDeActivate(Sender: TObject);
 begin
+{$IFDEF MSWINDOWS}
+  if Assigned(nbLeft) then
+    nbLeft.FinishMRUTabSwitch;
+  if Assigned(nbRight) then
+    nbRight.FinishMRUTabSwitch;
+{$ENDIF}
   if Assigned(frmTreeViewMenu) then
   begin
     frmTreeViewMenu.Close;
@@ -7435,4 +7457,3 @@ initialization
   TFormCommands.RegisterCommandsForm(TfrmMain, HotkeysCategory, @rsHotkeyCategoryMain);
 
 end.
-
